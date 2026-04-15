@@ -13,6 +13,6 @@ jobs:
       - name: Iniciar servidor
         run: uvicorn app.main:app --host 0.0.0.0 --port 8000 &
       - name: Esperar que arranque
-        run: sleep 5
+        run: sleep 10
       - name: Verificar que responde
-        run: curl http://localhost:8000
+        run: curl --retry 5 --retry-delay 2 http://localhost:8000
