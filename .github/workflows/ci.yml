@@ -8,5 +8,11 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Iniciar servidor
+        run: uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+      - name: Esperar que arranque
+        run: sleep 5
+      - name: Verificar que responde
+        run: curl http://localhost:8000
