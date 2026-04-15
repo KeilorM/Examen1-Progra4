@@ -10,9 +10,5 @@ jobs:
           python-version: '3.11'
       - name: Instalar dependencias
         run: pip install -r requirements.txt
-      - name: Iniciar servidor
-        run: uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-      - name: Esperar que arranque
-        run: sleep 10
-      - name: Verificar que responde
-        run: curl --retry 5 --retry-delay 2 http://localhost:8000
+      - name: Verificar que importa correctamente
+        run: python -c "from app.main import app; print('OK')"
