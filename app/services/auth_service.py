@@ -6,7 +6,8 @@ from app.models import Usuario
 import os
 import httpx
 from fastapi import Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer
+from fastapi.security.http import HTTPAuthorizationCredentials
 from app.database import get_db
 
 # ── Configuración JWT ──────────────────────────────────────────────────────────
@@ -17,9 +18,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # ── Generar token JWT ──────────────────────────────────────────────────────────
 def crear_token(data: dict) -> str:
-    """
-    Recibe un dict (normalmente {"sub": email}) y devuelve el JWT firmado.
-    """
     payload = data.copy()
     expira = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload.update({"exp": expira})
@@ -28,9 +26,6 @@ def crear_token(data: dict) -> str:
 
 # ── Verificar token JWT ────────────────────────────────────────────────────────
 def verificar_token(token: str) -> dict:
-    """
-    Decodifica y valida el JWT. Lanza 401 si es inválido o expirado.
-    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -50,12 +45,6 @@ def verificar_token(token: str) -> dict:
 
 # ── Login / registro con Google SSO ───────────────────────────────────────────
 def login_o_registrar_usuario(db: Session, google_data: dict) -> dict:
-    """
-    Recibe los datos que llegan de Google (email, nombre, google_id).
-    - Si el usuario ya existe → lo devuelve.
-    - Si no existe → lo crea en la BD.
-    Siempre retorna un JWT listo para usar.
-    """
     email     = google_data.get("email")
     nombre    = google_data.get("nombre")
     google_id = google_data.get("google_id")
@@ -66,11 +55,9 @@ def login_o_registrar_usuario(db: Session, google_data: dict) -> dict:
             detail="Datos de Google incompletos (faltan email o google_id)",
         )
 
-    # Buscar usuario existente
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
 
     if not usuario:
-        # Registrar nuevo usuario
         usuario = Usuario(
             email=email,
             nombre=nombre or "Sin nombre",
@@ -80,17 +67,12 @@ def login_o_registrar_usuario(db: Session, google_data: dict) -> dict:
         db.commit()
         db.refresh(usuario)
 
-    # Generar y devolver el token
     token = crear_token({"sub": usuario.email})
     return {"access_token": token, "token_type": "bearer"}
 
 
 # ── Obtener usuario actual desde el token ──────────────────────────────────────
 def get_usuario_actual(db: Session, token: str) -> Usuario:
-    """
-    Util para los endpoints protegidos: recibe el token, lo verifica
-    y devuelve el objeto Usuario de la BD.
-    """
     datos = verificar_token(token)
     usuario = db.query(Usuario).filter(Usuario.email == datos["email"]).first()
     if not usuario:
@@ -100,11 +82,12 @@ def get_usuario_actual(db: Session, token: str) -> Usuario:
         )
     return usuario
 
+
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login/google")
+oauth2_scheme = HTTPBearer()
 
 class AuthService:
 
@@ -147,7 +130,7 @@ class AuthService:
 
     @staticmethod
     def get_current_user(
-        token: str = Depends(oauth2_scheme),
+        credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
         db: Session = Depends(get_db)
     ) -> Usuario:
-        return get_usuario_actual(db, token)
+        return get_usuario_actual(db, credentials.credentials)
