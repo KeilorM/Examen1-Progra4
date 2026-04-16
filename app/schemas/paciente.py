@@ -3,11 +3,28 @@ from datetime import date, datetime
 from typing import Optional
 
 
+from fastapi import Form
+
 class PacienteCreate(BaseModel):
     nombre_completo: str = Field(..., example="Juan Pérez Solís")
     numero_identificacion: str = Field(..., example="118240567")
-    descripcion: Optional[str] = Field(None, example="Rx de tórax AP, paciente con dolor torácico")
+    descripcion: Optional[str] = Field(None, example="Rx de tórax AP")
     fecha_estudio: date = Field(..., example="2024-04-15")
+
+    @classmethod
+    def as_form(
+        cls,
+        nombre_completo: str = Form(...),
+        numero_identificacion: str = Form(...),
+        descripcion: Optional[str] = Form(None),
+        fecha_estudio: date = Form(...),
+    ):
+        return cls(
+            nombre_completo=nombre_completo,
+            numero_identificacion=numero_identificacion,
+            descripcion=descripcion,
+            fecha_estudio=fecha_estudio,
+        )
 
 
 class PacienteUpdate(BaseModel):
@@ -17,6 +34,20 @@ class PacienteUpdate(BaseModel):
     fecha_estudio: Optional[date] = Field(None, example="2024-04-15")
     imagen_url: Optional[str] = Field(None, example="https://res.cloudinary.com/demo/image/upload/sample.jpg")
 
+    @classmethod
+    def as_form(
+        cls,
+        nombre_completo: Optional[str] = Form(None),
+        numero_identificacion: Optional[str] = Form(None),
+        descripcion: Optional[str] = Form(None),
+        fecha_estudio: Optional[date] = Form(None),
+    ):
+        return cls(
+            nombre_completo=nombre_completo,
+            numero_identificacion=numero_identificacion,
+            descripcion=descripcion,
+            fecha_estudio=fecha_estudio,
+        )
 
 class PacienteResponse(BaseModel):
     id: int
@@ -55,3 +86,4 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+

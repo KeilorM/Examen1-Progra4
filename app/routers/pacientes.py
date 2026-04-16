@@ -48,7 +48,7 @@ def listar_pacientes(
     orden: Optional[str] = Query(
         "desc",
         description="Ordenar por fecha_estudio: 'asc' o 'desc'",
-        regex="^(asc|desc)$",
+        pattern="^(asc|desc)$",
     ),
     pagina: int = Query(1, ge=1, description="Número de página (empieza en 1)"),
     por_pagina: int = Query(10, ge=1, le=100, description="Registros por página (máx. 100)"),
