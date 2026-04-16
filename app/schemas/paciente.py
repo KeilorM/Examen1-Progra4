@@ -31,3 +31,27 @@ class PacienteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UsuarioBase(BaseModel):
+    email: str
+    nombre: str
+
+
+class UsuarioResponse(BaseModel):
+    id: int
+    email: str
+    nombre: str
+    creado_en: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
