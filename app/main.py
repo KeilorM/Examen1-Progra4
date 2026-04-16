@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-#from app.routers import pacientes, auth
+from app.routers import pacientes, auth
 
 # Crear tablas automáticamente
 Base.metadata.create_all(bind=engine)
@@ -22,8 +22,8 @@ app.add_middleware(
 )
 
 # Routers
-#app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
-#app.include_router(pacientes.router, prefix="/pacientes", tags=["Pacientes"])
+app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
+app.include_router(pacientes.router, prefix="/pacientes", tags=["Pacientes"])
 
 @app.get("/")
 def root():
