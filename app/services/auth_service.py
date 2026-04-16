@@ -4,6 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.models import Usuario
 import os
+import httpx
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
+from app.database import get_db
 
 # ── Configuración JWT ──────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("SECRET_KEY", "clave-secreta-cambiar-en-produccion")
@@ -95,3 +99,55 @@ def get_usuario_actual(db: Session, token: str) -> Usuario:
             detail="Usuario no encontrado",
         )
     return usuario
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login/google")
+
+class AuthService:
+
+    @staticmethod
+    def get_google_auth_url() -> str:
+        return (
+            "https://accounts.google.com/o/oauth2/v2/auth"
+            f"?client_id={GOOGLE_CLIENT_ID}"
+            "&response_type=code"
+            f"&redirect_uri={GOOGLE_REDIRECT_URI}"
+            "&scope=openid%20email%20profile"
+        )
+
+    @staticmethod
+    def handle_google_callback(code: str, db: Session) -> dict:
+        token_res = httpx.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            }
+        )
+        token_json = token_res.json()
+        access_token = token_json.get("access_token")
+
+        perfil_res = httpx.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        perfil = perfil_res.json()
+
+        return login_o_registrar_usuario(db, {
+            "email": perfil.get("email"),
+            "nombre": perfil.get("name"),
+            "google_id": perfil.get("id"),
+        })
+
+    @staticmethod
+    def get_current_user(
+        token: str = Depends(oauth2_scheme),
+        db: Session = Depends(get_db)
+    ) -> Usuario:
+        return get_usuario_actual(db, token)
