@@ -127,3 +127,26 @@ def eliminar_paciente(db: Session, paciente_id: int):
             detail=f"Paciente con ID {paciente_id} no encontrado",
         )
     return {"mensaje": f"Paciente {paciente_id} eliminado correctamente"}
+
+class PacienteService:
+
+    @staticmethod
+    def crear(datos, imagen, db):
+        return crear_paciente(db=db, datos=datos, usuario_id=1, imagen=imagen)
+
+    @staticmethod
+    def listar(db, nombre, orden, pagina, por_pagina):
+        skip = (pagina - 1) * por_pagina
+        return obtener_todos(db=db, skip=skip, limit=por_pagina, nombre=nombre)
+
+    @staticmethod
+    def obtener_por_id(paciente_id, db):
+        return obtener_por_id(db=db, paciente_id=paciente_id)
+
+    @staticmethod
+    def actualizar(paciente_id, datos, imagen, db):
+        return actualizar_paciente(db=db, paciente_id=paciente_id, datos=datos, imagen=imagen)
+
+    @staticmethod
+    def eliminar(paciente_id, db):
+        return eliminar_paciente(db=db, paciente_id=paciente_id)
