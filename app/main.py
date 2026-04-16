@@ -22,8 +22,8 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
-app.include_router(pacientes.router, prefix="/pacientes", tags=["Pacientes"])
+app.include_router(auth.router, tags=["Autenticación"])
+app.include_router(pacientes.router, tags=["Pacientes"])
 
 @app.get("/")
 def root():
