@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer  # ← agregar
 from app.database import engine, Base
 from app.routers import pacientes, auth
 
-# Crear tablas automáticamente
 Base.metadata.create_all(bind=engine)
+
+security = HTTPBearer()
 
 app = FastAPI(
     title="API Radiografías",
