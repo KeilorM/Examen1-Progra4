@@ -9,9 +9,9 @@ API para gestión de placas radiográficas de pacientes.
 2. python -m venv venv
 3. venv\Scripts\activate
 4. pip install -r requirements.txt
-5. Crear .env con las claves
+5. Crear .env con las claves (Las credenciales debe solicitarlas a alguno de los estudiantes del grupo).
 6. alembic upgrade head
-7. uvicorn app.main:app --reload
+7. uvicorn app.main:app --reload (Te despliega un link en localhost para poder ver la API). 
 
 ## Tecnologías
 - FastAPI
