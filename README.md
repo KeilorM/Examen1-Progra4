@@ -11,15 +11,18 @@ API para gestión de placas radiográficas de pacientes.
 4. pip install -r requirements.txt
 5. Crear .env con las claves (Las credenciales debe solicitarlas a alguno de los estudiantes del grupo).
 6. alembic upgrade head
-7. uvicorn app.main:app --reload (Te despliega un link en localhost para poder ver la API). 
+7. uvicorn app.main:app --reload (Te despliega un link en localhost para poder ver la API).
+8. Si quiera ver donde fue el API desplegada, este es el link del render: https://examen1-progra4.onrender.com
 
 ## Tecnologías
 - FastAPI
 - SQLite + SQLAlchemy + Alembic
 - Cloudinary
 - Google OAuth2 + JWT
-
+## Lenguage
+Python 3.13.7
 ## Decisiones técnicas
-- FastAPI en lugar de Django por compatibilidad con SQLAlchemy y Pydantic
-- SQLite para simplicidad en desarrollo
-- Cloudinary para CDN de imágenes
+- FastAPI en lugar de Django por compatibilidad con SQLAlchemy y Pydantic.
+- SQLite para simplicidad en desarrollo.
+- Cloudinary para CDN de imágenes.
+- Google Cloud para autenticación SSO.
