@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer  # ← agregar
+from fastapi.security import HTTPBearer
 from app.database import engine, Base
 from app.routers import pacientes, auth
+from fastapi.responses import RedirectResponse
 
 Base.metadata.create_all(bind=engine)
 
@@ -29,4 +30,4 @@ app.include_router(pacientes.router, tags=["Pacientes"])
 
 @app.get("/")
 def root():
-    return {"mensaje": "API Radiografías funcionando."}
+    return RedirectResponse(url="/docs")
