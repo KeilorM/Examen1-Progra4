@@ -1,10 +1,15 @@
 from sqlalchemy.orm import Session
 from app.models import Paciente
+from sqlalchemy import asc, desc
 
-def get_all(db: Session, skip: int = 0, limit: int = 10, nombre: str = None):
+def get_all(db: Session, skip: int = 0, limit: int = 10, nombre: str = None, orden: str = "desc"):
     query = db.query(Paciente)
     if nombre:
         query = query.filter(Paciente.nombre_completo.ilike(f"%{nombre}%"))
+    if orden == "asc":
+        query = query.order_by(asc(Paciente.fecha_estudio))
+    else:
+        query = query.order_by(desc(Paciente.fecha_estudio))
     return query.offset(skip).limit(limit).all()
 
 def get_by_id(db: Session, paciente_id: int):
