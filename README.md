@@ -24,8 +24,7 @@ CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
 ## URL de producción
-https://examen1-progra4.onrender.com
-
+https://examen1-progra4-production.up.railway.app/
 ## Tecnologías
 - FastAPI
 - SQLite + SQLAlchemy + Alembic
