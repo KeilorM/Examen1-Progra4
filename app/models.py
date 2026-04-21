@@ -24,6 +24,7 @@ class Paciente(Base):
     descripcion = Column(String, nullable=True)
     fecha_estudio = Column(Date, nullable=False)
     imagen_url = Column(String, nullable=True)
+    public_id = Column(String, nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
