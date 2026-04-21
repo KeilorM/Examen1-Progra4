@@ -55,7 +55,7 @@ class PacienteResponse(BaseModel):
     numero_identificacion: str
     descripcion: Optional[str] = None
     fecha_estudio: date
-    imagen_url: Optional[str] = None
+    imagen_url: str = "Imagen protegida - use /url-firmada"
     creado_en: datetime
     actualizado_en: datetime
     usuario_id: int
