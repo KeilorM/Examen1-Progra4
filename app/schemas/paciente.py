@@ -49,16 +49,25 @@ class PacienteUpdate(BaseModel):
             fecha_estudio=fecha_estudio,
         )
 
+from pydantic import BaseModel, Field, field_validator
+
 class PacienteResponse(BaseModel):
     id: int
     nombre_completo: str
     numero_identificacion: str
     descripcion: Optional[str] = None
     fecha_estudio: date
-    imagen_url: str = "Imagen protegida - use /url-firmada"
+    imagen_url: Optional[str] = None
     creado_en: datetime
     actualizado_en: datetime
     usuario_id: int
+
+    @field_validator("imagen_url", mode="before")
+    @classmethod
+    def proteger_imagen_url(cls, v):
+        if v:
+            return "Imagen protegida - use /url-firmada"
+        return None
 
     class Config:
         from_attributes = True
