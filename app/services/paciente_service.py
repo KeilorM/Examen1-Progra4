@@ -188,12 +188,12 @@ def hacer_imagenes_privadas(db: Session):
     pacientes = db.query(Paciente).filter(
         Paciente.public_id != None
     ).all()
-    
+
     for paciente in pacientes:
         try:
             cloudinary.uploader.explicit(
                 paciente.public_id,
-                type="upload",
+                type="authenticated",
                 access_control=[{"access_type": "token"}]
             )
             print(f"Imagen ocultada: {paciente.public_id} ✅")

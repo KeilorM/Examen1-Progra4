@@ -33,4 +33,10 @@ def startup_event():
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/docs")#cambio
+    return RedirectResponse(url="/docs")
+
+@app.on_event("startup")
+def startup_event():
+    import subprocess
+    subprocess.run(["alembic", "upgrade", "head"])
+    iniciar_scheduler()
