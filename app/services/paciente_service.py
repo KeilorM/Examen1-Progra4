@@ -76,17 +76,17 @@ def crear_paciente(
     imagen: UploadFile = None,
 ):
     imagen_url = None
-    imagen_public_id = None
+    public_id = None
 
     if imagen and imagen.filename:
         imagen_data = subir_imagen(imagen)
         imagen_url = imagen_data["url"]
-        imagen_public_id = imagen_data["public_id"]
+        public_id = imagen_data["public_id"]
 
     data_dict = datos.model_dump()
     data_dict["usuario_id"] = usuario_id
     data_dict["imagen_url"] = imagen_url
-    data_dict["imagen_public_id"] = imagen_public_id
+    data_dict["public_id"] = public_id
 
     return paciente_repo.create(db, data_dict)
 
@@ -104,7 +104,7 @@ def actualizar_paciente(
     if imagen and imagen.filename:
         imagen_data = subir_imagen(imagen)
         data_dict["imagen_url"] = imagen_data["url"]
-        data_dict["imagen_public_id"] = imagen_data["public_id"]
+        data_dict["public_id"] = imagen_data["public_id"]
 
     actualizado = paciente_repo.update(db, paciente_id, data_dict)
     if not actualizado:
@@ -147,3 +147,26 @@ class PacienteService:
     @staticmethod
     def eliminar(paciente_id, db):
         return eliminar_paciente(db=db, paciente_id=paciente_id)
+
+
+# ── Job para hacer imágenes privadas ──────────────────────────────────────────
+def hacer_imagenes_privadas(db: Session):
+    """
+    Cambia todas las imágenes a privadas en Cloudinary.
+    Se ejecuta automáticamente a las 11:59.
+    """
+    from app.models import Paciente
+    pacientes = db.query(Paciente).filter(
+        Paciente.public_id != None
+    ).all()
+    
+    for paciente in pacientes:
+        try:
+            cloudinary.uploader.explicit(
+                paciente.public_id,
+                type="upload",
+                access_control=[{"access_type": "token"}]
+            )
+            print(f"Imagen ocultada: {paciente.public_id} ✅")
+        except Exception as e:
+            print(f"Error ocultando imagen {paciente.public_id}: {e}")
