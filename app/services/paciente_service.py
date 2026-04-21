@@ -15,13 +15,13 @@ cloudinary.config(
 TIPOS_PERMITIDOS = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 TAMANO_MAXIMO_MB = 5
 TAMANO_MAXIMO_BYTES = TAMANO_MAXIMO_MB * 1024 * 1024
-#ze zuve la imagen
-def subir_imagen(archivo: UploadFile) -> str:
+
+# ── Subida de imagen ──────────────────────────────────────────────────────────
+def subir_imagen(archivo: UploadFile) -> dict:
     """
     Valida y sube una imagen a Cloudinary.
-    Devuelve la URL pública (CDN).
+    Devuelve un dict con URL y public_id.
     """
-    # Validar tipo
     if archivo.content_type not in TIPOS_PERMITIDOS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -29,7 +29,6 @@ def subir_imagen(archivo: UploadFile) -> str:
                    f"Use: {', '.join(TIPOS_PERMITIDOS)}",
         )
 
-    # Leer contenido y validar tamaño
     contenido = archivo.file.read()
     if len(contenido) > TAMANO_MAXIMO_BYTES:
         raise HTTPException(
@@ -37,14 +36,16 @@ def subir_imagen(archivo: UploadFile) -> str:
             detail=f"El archivo supera el tamaño máximo de {TAMANO_MAXIMO_MB} MB",
         )
 
-    # Subir a Cloudinary
     try:
         resultado = cloudinary.uploader.upload(
             contenido,
-            folder="radiografias",       # carpeta en tu cuenta Cloudinary
+            folder="radiografias",
             resource_type="image",
         )
-        return resultado["secure_url"]   # URL HTTPS del CDN
+        return {
+            "url": resultado["secure_url"],
+            "public_id": resultado["public_id"]
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -55,12 +56,10 @@ def subir_imagen(archivo: UploadFile) -> str:
 # ── CRUD ───────────────────────────────────────────────────────────────────────
 
 def obtener_todos(db: Session, skip: int = 0, limit: int = 10, nombre: str = None):
-    """Lista paginada de pacientes, con filtro opcional por nombre."""
     return paciente_repo.get_all(db, skip=skip, limit=limit, nombre=nombre)
 
 
 def obtener_por_id(db: Session, paciente_id: int):
-    """Devuelve un paciente por ID o lanza 404."""
     paciente = paciente_repo.get_by_id(db, paciente_id)
     if not paciente:
         raise HTTPException(
@@ -76,17 +75,18 @@ def crear_paciente(
     usuario_id: int,
     imagen: UploadFile = None,
 ):
-    """
-    Crea un nuevo paciente.
-    Si se adjunta imagen, la sube a Cloudinary y guarda la URL.
-    """
     imagen_url = None
+    imagen_public_id = None
+
     if imagen and imagen.filename:
-        imagen_url = subir_imagen(imagen)
+        imagen_data = subir_imagen(imagen)
+        imagen_url = imagen_data["url"]
+        imagen_public_id = imagen_data["public_id"]
 
     data_dict = datos.model_dump()
     data_dict["usuario_id"] = usuario_id
     data_dict["imagen_url"] = imagen_url
+    data_dict["imagen_public_id"] = imagen_public_id
 
     return paciente_repo.create(db, data_dict)
 
@@ -97,17 +97,14 @@ def actualizar_paciente(
     datos: PacienteUpdate,
     imagen: UploadFile = None,
 ):
-    """
-    Actualiza campos de un paciente.
-    Si se adjunta nueva imagen, reemplaza la URL en Cloudinary.
-    """
-    # Verificar que existe
     obtener_por_id(db, paciente_id)
 
-    data_dict = datos.model_dump(exclude_unset=True)  # solo campos enviados
+    data_dict = datos.model_dump(exclude_unset=True)
 
     if imagen and imagen.filename:
-        data_dict["imagen_url"] = subir_imagen(imagen)
+        imagen_data = subir_imagen(imagen)
+        data_dict["imagen_url"] = imagen_data["url"]
+        data_dict["imagen_public_id"] = imagen_data["public_id"]
 
     actualizado = paciente_repo.update(db, paciente_id, data_dict)
     if not actualizado:
@@ -119,7 +116,6 @@ def actualizar_paciente(
 
 
 def eliminar_paciente(db: Session, paciente_id: int):
-    """Elimina un paciente. Lanza 404 si no existe."""
     eliminado = paciente_repo.delete(db, paciente_id)
     if not eliminado:
         raise HTTPException(
@@ -127,6 +123,7 @@ def eliminar_paciente(db: Session, paciente_id: int):
             detail=f"Paciente con ID {paciente_id} no encontrado",
         )
     return {"mensaje": f"Paciente {paciente_id} eliminado correctamente"}
+
 
 class PacienteService:
 
