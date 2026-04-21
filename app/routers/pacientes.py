@@ -8,10 +8,17 @@ from app.schemas.paciente import PacienteCreate, PacienteResponse, PacienteUpdat
 from app.services.auth_service import AuthService
 from app.services.paciente_service import PacienteService
 
+# Router protegido — requiere autenticación
 router = APIRouter(
     prefix="/pacientes",
     tags=["Pacientes"],
     dependencies=[Depends(AuthService.get_current_user)],
+)
+
+# Router público — solo para servir imágenes
+router_publico = APIRouter(
+    prefix="/pacientes",
+    tags=["Pacientes"],
 )
 
 
@@ -20,12 +27,6 @@ router = APIRouter(
     response_model=PacienteResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar un nuevo paciente",
-    description=(
-        "Crea un nuevo registro de paciente con su placa radiográfica. "
-        "La imagen debe enviarse como multipart/form-data. "
-        "Se valida el tipo (image/jpeg, image/png) y el tamaño máximo (5 MB). "
-        "La imagen se sube a Cloudinary de forma privada."
-    ),
 )
 def crear_paciente(
     datos: PacienteCreate = Depends(PacienteCreate.as_form),
@@ -39,10 +40,6 @@ def crear_paciente(
     "/",
     response_model=list[PacienteResponse],
     summary="Listar pacientes",
-    description=(
-        "Devuelve una lista paginada de pacientes. "
-        "Soporta filtro por nombre y ordenamiento por fecha de estudio."
-    ),
 )
 def listar_pacientes(
     nombre: Optional[str] = Query(None, description="Filtrar por nombre (búsqueda parcial)"),
@@ -64,7 +61,6 @@ def listar_pacientes(
     "/{paciente_id}",
     response_model=PacienteResponse,
     summary="Obtener un paciente por ID",
-    description="Devuelve el detalle completo de un paciente.",
 )
 def obtener_paciente(paciente_id: int, db: Session = Depends(get_db)):
     paciente = PacienteService.obtener_por_id(paciente_id=paciente_id, db=db)
@@ -79,11 +75,6 @@ def obtener_paciente(paciente_id: int, db: Session = Depends(get_db)):
 @router.get(
     "/{paciente_id}/url-firmada",
     summary="Obtener URL firmada de la imagen",
-    description=(
-        "Genera una URL temporal que apunta al endpoint proxy de tu backend. "
-        "La URL expira según los minutos indicados (por defecto 10). "
-        "La URL de Cloudinary nunca se expone al cliente."
-    ),
 )
 def obtener_url_firmada(
     paciente_id: int,
@@ -97,31 +88,10 @@ def obtener_url_firmada(
     )
 
 
-@router.get(
-    "/{paciente_id}/imagen",
-    summary="Ver imagen del paciente (proxy)",
-    description=(
-        "Sirve la imagen del paciente directamente desde el backend. "
-        "Solo funciona si previamente se solicitó una URL firmada vigente. "
-        "Retorna 403 si el acceso expiró."
-    ),
-)
-async def ver_imagen(paciente_id: int, db: Session = Depends(get_db)):
-    contenido, content_type = await PacienteService.servir_imagen(
-        paciente_id=paciente_id,
-        db=db,
-    )
-    return Response(content=contenido, media_type=content_type)
-
-
 @router.put(
     "/{paciente_id}",
     response_model=PacienteResponse,
     summary="Actualizar un paciente",
-    description=(
-        "Actualiza los datos de un paciente existente. "
-        "Si se envía una nueva imagen, reemplaza la anterior en Cloudinary."
-    ),
 )
 def actualizar_paciente(
     paciente_id: int,
@@ -144,12 +114,20 @@ def actualizar_paciente(
     "/{paciente_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar un paciente",
-    description="Elimina el registro del paciente y la imagen asociada en Cloudinary.",
 )
 def eliminar_paciente(paciente_id: int, db: Session = Depends(get_db)):
-    eliminado = PacienteService.eliminar(paciente_id=paciente_id, db=db)
-    if not eliminado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Paciente con id {paciente_id} no encontrado.",
-        )
+    PacienteService.eliminar(paciente_id=paciente_id, db=db)
+
+
+# ✅ Endpoint público — sin autenticación, controlado por url_expira_en en BD
+@router_publico.get(
+    "/{paciente_id}/imagen",
+    summary="Ver imagen del paciente (proxy público)",
+    description="Sirve la imagen solo si la URL firmada está vigente. Retorna 403 si expiró.",
+)
+async def ver_imagen(paciente_id: int, db: Session = Depends(get_db)):
+    contenido, content_type = await PacienteService.servir_imagen(
+        paciente_id=paciente_id,
+        db=db,
+    )
+    return Response(content=contenido, media_type=content_type)
