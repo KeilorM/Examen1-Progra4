@@ -18,7 +18,7 @@ def iniciar_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         ejecutar_tarea_privacidad,
-        CronTrigger(second = "*/10"),
+        CronTrigger(hour=23, minute=59),
         id="ocultar_imagenes",
         replace_existing=True,
     )
