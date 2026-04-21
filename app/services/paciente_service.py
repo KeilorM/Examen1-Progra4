@@ -37,7 +37,6 @@ def subir_imagen(archivo: UploadFile) -> dict:
         )
 
     try:
-        # Se sube como tipo "authenticated" — no accesible públicamente
         resultado = cloudinary.uploader.upload(
             contenido,
             folder="radiografias",
@@ -57,13 +56,8 @@ def subir_imagen(archivo: UploadFile) -> dict:
 
 # ── Descarga interna desde Cloudinary (solo backend) ─────────────────────────
 async def descargar_imagen_cloudinary(public_id: str) -> tuple[bytes, str]:
-    """
-    Genera una URL firmada de corta duración (30 seg) solo para
-    que el backend descargue la imagen y la reenvíe al cliente.
-    La URL nunca se expone al frontend.
-    """
     import time
-    expiracion = int(time.time()) + 30  # 30 segundos, solo para descarga interna
+    expiracion = int(time.time()) + 30
 
     url_interna = cloudinary.utils.private_download_url(
         public_id,
@@ -127,7 +121,7 @@ def actualizar_paciente(db: Session, paciente_id: int, datos: PacienteUpdate, im
         imagen_data = subir_imagen(imagen)
         data_dict["imagen_url"]    = imagen_data["url"]
         data_dict["public_id"]     = imagen_data["public_id"]
-        data_dict["url_expira_en"] = None  # resetear expiración al subir nueva imagen
+        data_dict["url_expira_en"] = None
 
     actualizado = paciente_repo.update(db, paciente_id, data_dict)
     if not actualizado:
@@ -150,10 +144,6 @@ def eliminar_paciente(db: Session, paciente_id: int):
 
 # ── Job: limpiar url_expira_en vencidas ───────────────────────────────────────
 def hacer_imagenes_privadas(db: Session):
-    """
-    Limpia url_expira_en de pacientes cuyo acceso ya venció.
-    Se ejecuta periódicamente desde el scheduler.
-    """
     from app.models import Paciente
 
     ahora    = datetime.utcnow()
@@ -209,8 +199,10 @@ class PacienteService:
         db.add(paciente)
         db.commit()
 
-        # ✅ Se devuelve la URL del proxy, nunca la URL de Cloudinary
-        url_proxy = f"/pacientes/{paciente_id}/imagen"
+        # ✅ URL completa con dominio desde variable de entorno
+        base_url = os.getenv("BASE_URL", "http://localhost:8000")
+        url_proxy = f"{base_url}/pacientes/{paciente_id}/imagen"
+
         return {"url_firmada": url_proxy, "expira_en_minutos": expiracion_minutos}
 
     @staticmethod
