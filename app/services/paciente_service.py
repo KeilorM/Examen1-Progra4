@@ -40,10 +40,11 @@ def subir_imagen(archivo: UploadFile) -> dict:
 
     try:
         resultado = cloudinary.uploader.upload(
-            contenido,
-            folder="radiografias",
-            resource_type="image",
-        )
+        contenido,
+        folder="radiografias",
+        resource_type="image",
+        type="authenticated",
+    )
         return {
             "url": resultado["secure_url"],
             "public_id": resultado["public_id"]
@@ -64,7 +65,7 @@ def generar_url_firmada(public_id: str, expiracion_minutos: int = 10) -> str:
 
     url = cloudinary.utils.cloudinary_url(
         public_id,
-        type="upload",
+        type="authenticated",
         sign_url=True,
         expires_at=expiracion,
     )[0]
