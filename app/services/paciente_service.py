@@ -54,13 +54,14 @@ def subir_imagen(archivo: UploadFile) -> dict:
         )
 
 
-# ── Descarga interna desde Cloudinary (solo backend) ─────────────────────────
 async def descargar_imagen_cloudinary(public_id: str) -> tuple[bytes, str]:
     import time
     expiracion = int(time.time()) + 30
 
+    # ✅ Agregar format="jpg"
     url_interna = cloudinary.utils.private_download_url(
         public_id,
+        format="jpg",              # ← ESTO FALTABA
         resource_type="image",
         type="authenticated",
         expires_at=expiracion,
