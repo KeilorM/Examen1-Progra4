@@ -38,7 +38,4 @@ app.add_middleware(
 
 app.include_router(auth.router, tags=["Autenticación"])
 app.include_router(pacientes.router, tags=["Pacientes"])
-
-@app.get("/")
-def root():
-    return RedirectResponse(url="/docs")
+app.include_router(pacientes.router_publico, tags=["Pacientes"])
