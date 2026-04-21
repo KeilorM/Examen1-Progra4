@@ -46,7 +46,7 @@ def subir_imagen(archivo: UploadFile) -> dict:
         type="authenticated",
     )
         return {
-            "url": None,
+            "url":  resultado["secure_url"],
             "public_id": resultado["public_id"]
         }
     except Exception as e:
@@ -58,17 +58,14 @@ def subir_imagen(archivo: UploadFile) -> dict:
 
 # ── URL firmada ───────────────────────────────────────────────────────────────
 def generar_url_firmada(public_id: str, expiracion_minutos: int = 10) -> str:
-    """
-    Genera una URL firmada con expiración para acceder a imagen privada.
-    """
     expiracion = int(time.time()) + (expiracion_minutos * 60)
 
-    url = cloudinary.utils.cloudinary_url(
+    url = cloudinary.utils.private_download_url(
         public_id,
+        resource_type="image",
         type="authenticated",
-        sign_url=True,
-        expires_at=expiracion,
-    )[0]
+        expires_at=expiracion
+    )
     return url
 
 
