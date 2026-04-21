@@ -46,7 +46,7 @@ def subir_imagen(archivo: UploadFile) -> dict:
         type="authenticated",
     )
         return {
-            "url": resultado["secure_url"],
+            "url": None,
             "public_id": resultado["public_id"]
         }
     except Exception as e:
