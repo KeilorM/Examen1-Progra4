@@ -32,7 +32,7 @@ class PacienteUpdate(BaseModel):
     numero_identificacion: Optional[str] = Field(None, example="118240567")
     descripcion: Optional[str] = Field(None, example="Rx de tórax AP")
     fecha_estudio: Optional[date] = Field(None, example="2024-04-15")
-    imagen_url: Optional[str] = Field(None, example="https://res.cloudinary.com/demo/image/upload/sample.jpg")
+    imagen_url: Optional[str] = None
 
     @classmethod
     def as_form(
