@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.responses import RedirectResponse
-import subprocess
 
 try:
     from app.database import engine, Base
@@ -18,7 +17,6 @@ security = HTTPBearer()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    subprocess.run(["alembic", "upgrade", "head"])
     scheduler = iniciar_scheduler()
     yield
     scheduler.shutdown()
