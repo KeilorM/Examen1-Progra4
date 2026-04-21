@@ -64,7 +64,7 @@ def generar_url_firmada(public_id: str, expiracion_minutos: int = 10) -> str:
 
     url = cloudinary.utils.cloudinary_url(
         public_id,
-        type="authenticated",
+        type="upload",
         sign_url=True,
         expires_at=expiracion,
     )[0]
