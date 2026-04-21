@@ -1,7 +1,8 @@
-import time
+import httpx
 import cloudinary
 import cloudinary.uploader
 import cloudinary.utils
+from datetime import datetime, timedelta
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from app.repositories import paciente_repo
@@ -9,21 +10,18 @@ from app.schemas.paciente import PacienteCreate, PacienteUpdate
 import os
 
 cloudinary.config(
-    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key    = os.getenv("CLOUDINARY_API_KEY"),
-    api_secret = os.getenv("CLOUDINARY_API_SECRET"),
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
 )
 
 TIPOS_PERMITIDOS = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 TAMANO_MAXIMO_MB = 5
 TAMANO_MAXIMO_BYTES = TAMANO_MAXIMO_MB * 1024 * 1024
 
+
 # ── Subida de imagen ──────────────────────────────────────────────────────────
 def subir_imagen(archivo: UploadFile) -> dict:
-    """
-    Valida y sube una imagen a Cloudinary.
-    Devuelve un dict con URL y public_id.
-    """
     if archivo.content_type not in TIPOS_PERMITIDOS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -39,15 +37,16 @@ def subir_imagen(archivo: UploadFile) -> dict:
         )
 
     try:
+        # Se sube como tipo "authenticated" — no accesible públicamente
         resultado = cloudinary.uploader.upload(
-        contenido,
-        folder="radiografias",
-        resource_type="image",
-        type="authenticated",
-    )
+            contenido,
+            folder="radiografias",
+            resource_type="image",
+            type="authenticated",
+        )
         return {
-            "url":  resultado["secure_url"],
-            "public_id": resultado["public_id"]
+            "url": resultado["secure_url"],
+            "public_id": resultado["public_id"],
         }
     except Exception as e:
         raise HTTPException(
@@ -56,21 +55,38 @@ def subir_imagen(archivo: UploadFile) -> dict:
         )
 
 
-# ── URL firmada ───────────────────────────────────────────────────────────────
-def generar_url_firmada(public_id: str, expiracion_minutos: int = 10) -> str:
-    expiracion = int(time.time()) + (expiracion_minutos * 60)
+# ── Descarga interna desde Cloudinary (solo backend) ─────────────────────────
+async def descargar_imagen_cloudinary(public_id: str) -> tuple[bytes, str]:
+    """
+    Genera una URL firmada de corta duración (30 seg) solo para
+    que el backend descargue la imagen y la reenvíe al cliente.
+    La URL nunca se expone al frontend.
+    """
+    import time
+    expiracion = int(time.time()) + 30  # 30 segundos, solo para descarga interna
 
-    url = cloudinary.utils.private_download_url(
+    url_interna = cloudinary.utils.private_download_url(
         public_id,
         resource_type="image",
         type="authenticated",
-        expires_at=expiracion
+        expires_at=expiracion,
+        attachment=False,
     )
-    return url
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url_interna)
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo obtener la imagen desde Cloudinary",
+        )
+
+    content_type = resp.headers.get("content-type", "image/jpeg")
+    return resp.content, content_type
 
 
 # ── CRUD ───────────────────────────────────────────────────────────────────────
-
 def obtener_todos(db: Session, skip: int = 0, limit: int = 10, nombre: str = None):
     return paciente_repo.get_all(db, skip=skip, limit=limit, nombre=nombre)
 
@@ -85,42 +101,33 @@ def obtener_por_id(db: Session, paciente_id: int):
     return paciente
 
 
-def crear_paciente(
-    db: Session,
-    datos: PacienteCreate,
-    usuario_id: int,
-    imagen: UploadFile = None,
-):
+def crear_paciente(db: Session, datos: PacienteCreate, usuario_id: int, imagen: UploadFile = None):
     imagen_url = None
-    public_id = None
+    public_id  = None
 
     if imagen and imagen.filename:
         imagen_data = subir_imagen(imagen)
-        imagen_url = imagen_data["url"]
-        public_id = imagen_data["public_id"]
+        imagen_url  = imagen_data["url"]
+        public_id   = imagen_data["public_id"]
 
     data_dict = datos.model_dump()
-    data_dict["usuario_id"] = usuario_id
-    data_dict["imagen_url"] = imagen_url
-    data_dict["public_id"] = public_id
+    data_dict["usuario_id"]    = usuario_id
+    data_dict["imagen_url"]    = imagen_url
+    data_dict["public_id"]     = public_id
+    data_dict["url_expira_en"] = None
 
     return paciente_repo.create(db, data_dict)
 
 
-def actualizar_paciente(
-    db: Session,
-    paciente_id: int,
-    datos: PacienteUpdate,
-    imagen: UploadFile = None,
-):
+def actualizar_paciente(db: Session, paciente_id: int, datos: PacienteUpdate, imagen: UploadFile = None):
     obtener_por_id(db, paciente_id)
-
     data_dict = datos.model_dump(exclude_unset=True)
 
     if imagen and imagen.filename:
         imagen_data = subir_imagen(imagen)
-        data_dict["imagen_url"] = imagen_data["url"]
-        data_dict["public_id"] = imagen_data["public_id"]
+        data_dict["imagen_url"]    = imagen_data["url"]
+        data_dict["public_id"]     = imagen_data["public_id"]
+        data_dict["url_expira_en"] = None  # resetear expiración al subir nueva imagen
 
     actualizado = paciente_repo.update(db, paciente_id, data_dict)
     if not actualizado:
@@ -141,6 +148,30 @@ def eliminar_paciente(db: Session, paciente_id: int):
     return {"mensaje": f"Paciente {paciente_id} eliminado correctamente"}
 
 
+# ── Job: limpiar url_expira_en vencidas ───────────────────────────────────────
+def hacer_imagenes_privadas(db: Session):
+    """
+    Limpia url_expira_en de pacientes cuyo acceso ya venció.
+    Se ejecuta periódicamente desde el scheduler.
+    """
+    from app.models import Paciente
+
+    ahora    = datetime.utcnow()
+    vencidos = db.query(Paciente).filter(
+        Paciente.public_id     != None,
+        Paciente.url_expira_en != None,
+        Paciente.url_expira_en <= ahora,
+    ).all()
+
+    for paciente in vencidos:
+        paciente.url_expira_en = None
+        db.add(paciente)
+        print(f"Acceso expirado limpiado: paciente {paciente.id} ✅")
+
+    db.commit()
+
+
+# ── PacienteService ───────────────────────────────────────────────────────────
 class PacienteService:
 
     @staticmethod
@@ -172,28 +203,32 @@ class PacienteService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Este paciente no tiene imagen asociada",
             )
-        url = generar_url_firmada(paciente.public_id, expiracion_minutos)
-        return {"url_firmada": url, "expira_en_minutos": expiracion_minutos}
 
+        expira_dt = datetime.utcnow() + timedelta(minutes=expiracion_minutos)
+        paciente.url_expira_en = expira_dt
+        db.add(paciente)
+        db.commit()
 
-# ── Job para hacer imágenes privadas ──────────────────────────────────────────
-def hacer_imagenes_privadas(db: Session):
-    """
-    Cambia todas las imágenes a privadas en Cloudinary.
-    Se ejecuta automáticamente a las 11:59.
-    """
-    from app.models import Paciente
-    pacientes = db.query(Paciente).filter(
-        Paciente.public_id != None
-    ).all()
+        # ✅ Se devuelve la URL del proxy, nunca la URL de Cloudinary
+        url_proxy = f"/pacientes/{paciente_id}/imagen"
+        return {"url_firmada": url_proxy, "expira_en_minutos": expiracion_minutos}
 
-    for paciente in pacientes:
-        try:
-            cloudinary.uploader.explicit(
-                paciente.public_id,
-                type="authenticated",
-                access_control=[{"access_type": "token"}]
+    @staticmethod
+    async def servir_imagen(paciente_id: int, db: Session):
+        paciente = obtener_por_id(db=db, paciente_id=paciente_id)
+
+        if not paciente.public_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Este paciente no tiene imagen asociada",
             )
-            print(f"Imagen ocultada: {paciente.public_id} ✅")
-        except Exception as e:
-            print(f"Error ocultando imagen {paciente.public_id}: {e}")
+
+        # ✅ Verificar si el acceso está vigente
+        if not paciente.url_expira_en or paciente.url_expira_en < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso expirado. Solicite una nueva URL firmada.",
+            )
+
+        contenido, content_type = await descargar_imagen_cloudinary(paciente.public_id)
+        return contenido, content_type

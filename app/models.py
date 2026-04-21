@@ -25,6 +25,7 @@ class Paciente(Base):
     fecha_estudio = Column(Date, nullable=False)
     imagen_url = Column(String, nullable=True)
     public_id = Column(String, nullable=True)
+    url_expira_en = Column(DateTime, nullable=True)       # ← NUEVO
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
