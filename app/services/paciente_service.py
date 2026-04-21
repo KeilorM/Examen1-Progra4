@@ -1,5 +1,7 @@
+import time
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from app.repositories import paciente_repo
@@ -51,6 +53,22 @@ def subir_imagen(archivo: UploadFile) -> dict:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Error al subir imagen a Cloudinary: {str(e)}",
         )
+
+
+# ── URL firmada ───────────────────────────────────────────────────────────────
+def generar_url_firmada(public_id: str, expiracion_minutos: int = 10) -> str:
+    """
+    Genera una URL firmada con expiración para acceder a imagen privada.
+    """
+    expiracion = int(time.time()) + (expiracion_minutos * 60)
+
+    url = cloudinary.utils.cloudinary_url(
+        public_id,
+        type="authenticated",
+        sign_url=True,
+        expires_at=expiracion,
+    )[0]
+    return url
 
 
 # ── CRUD ───────────────────────────────────────────────────────────────────────
@@ -147,6 +165,17 @@ class PacienteService:
     @staticmethod
     def eliminar(paciente_id, db):
         return eliminar_paciente(db=db, paciente_id=paciente_id)
+
+    @staticmethod
+    def obtener_url_firmada(paciente_id: int, expiracion_minutos: int, db: Session):
+        paciente = obtener_por_id(db=db, paciente_id=paciente_id)
+        if not paciente.public_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Este paciente no tiene imagen asociada",
+            )
+        url = generar_url_firmada(paciente.public_id, expiracion_minutos)
+        return {"url_firmada": url, "expira_en_minutos": expiracion_minutos}
 
 
 # ── Job para hacer imágenes privadas ──────────────────────────────────────────
