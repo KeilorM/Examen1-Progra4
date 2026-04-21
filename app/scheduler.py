@@ -20,9 +20,11 @@ def iniciar_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         ejecutar_tarea_privacidad,
-        CronTrigger(minute="*/1"),   # cada minuto
+        CronTrigger(minute="*/1"),
         id="ocultar_imagenes",
         replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=30,
     )
     scheduler.start()
     print("Scheduler iniciado ✅ - Revisando accesos vencidos cada minuto")
