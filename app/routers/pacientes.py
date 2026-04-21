@@ -75,6 +75,26 @@ def obtener_paciente(paciente_id: int, db: Session = Depends(get_db)):
     return paciente
 
 
+@router.get(
+    "/{paciente_id}/url-firmada",
+    summary="Obtener URL firmada de la imagen",
+    description=(
+        "Genera una URL temporal y firmada para acceder a la imagen privada del paciente. "
+        "La URL expira según los minutos indicados (por defecto 10)."
+    ),
+)
+def obtener_url_firmada(
+    paciente_id: int,
+    expiracion_minutos: int = Query(10, ge=1, le=60, description="Minutos hasta que expira la URL (máx. 60)"),
+    db: Session = Depends(get_db),
+):
+    return PacienteService.obtener_url_firmada(
+        paciente_id=paciente_id,
+        expiracion_minutos=expiracion_minutos,
+        db=db,
+    )
+
+
 @router.put(
     "/{paciente_id}",
     response_model=PacienteResponse,
