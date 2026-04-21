@@ -3,10 +3,11 @@ from apscheduler.triggers.cron import CronTrigger
 from app.database import SessionLocal
 from app.services.paciente_service import hacer_imagenes_privadas
 
+
 def ejecutar_tarea_privacidad():
     db = SessionLocal()
     try:
-        print("Ejecutando tarea: ocultando imágenes...")
+        print("Ejecutando tarea: limpiando accesos vencidos...")
         hacer_imagenes_privadas(db)
         print("Tarea completada ✅")
     except Exception as e:
@@ -14,15 +15,15 @@ def ejecutar_tarea_privacidad():
     finally:
         db.close()
 
+
 def iniciar_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         ejecutar_tarea_privacidad,
-        CronTrigger(minute="*/2"),
-        #CronTrigger(hour=23, minute=59),
+        CronTrigger(minute="*/1"),   # cada minuto
         id="ocultar_imagenes",
         replace_existing=True,
     )
     scheduler.start()
-    print("Scheduler iniciado ✅ - Tarea a las 23:59")
+    print("Scheduler iniciado ✅ - Revisando accesos vencidos cada minuto")
     return scheduler

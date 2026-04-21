@@ -1,5 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -23,7 +24,7 @@ router = APIRouter(
         "Crea un nuevo registro de paciente con su placa radiográfica. "
         "La imagen debe enviarse como multipart/form-data. "
         "Se valida el tipo (image/jpeg, image/png) y el tamaño máximo (5 MB). "
-        "La imagen se sube a Cloudinary y la URL pública se persiste en la BD."
+        "La imagen se sube a Cloudinary de forma privada."
     ),
 )
 def crear_paciente(
@@ -63,7 +64,7 @@ def listar_pacientes(
     "/{paciente_id}",
     response_model=PacienteResponse,
     summary="Obtener un paciente por ID",
-    description="Devuelve el detalle completo de un paciente, incluyendo la URL de su placa radiográfica.",
+    description="Devuelve el detalle completo de un paciente.",
 )
 def obtener_paciente(paciente_id: int, db: Session = Depends(get_db)):
     paciente = PacienteService.obtener_por_id(paciente_id=paciente_id, db=db)
@@ -79,13 +80,14 @@ def obtener_paciente(paciente_id: int, db: Session = Depends(get_db)):
     "/{paciente_id}/url-firmada",
     summary="Obtener URL firmada de la imagen",
     description=(
-        "Genera una URL temporal y firmada para acceder a la imagen privada del paciente. "
-        "La URL expira según los minutos indicados (por defecto 10)."
+        "Genera una URL temporal que apunta al endpoint proxy de tu backend. "
+        "La URL expira según los minutos indicados (por defecto 10). "
+        "La URL de Cloudinary nunca se expone al cliente."
     ),
 )
 def obtener_url_firmada(
     paciente_id: int,
-    expiracion_minutos: int = Query(10, ge=1, le=60, description="Minutos hasta que expira la URL (máx. 60)"),
+    expiracion_minutos: int = Query(10, ge=1, le=60, description="Minutos hasta que expira (máx. 60)"),
     db: Session = Depends(get_db),
 ):
     return PacienteService.obtener_url_firmada(
@@ -95,13 +97,30 @@ def obtener_url_firmada(
     )
 
 
+@router.get(
+    "/{paciente_id}/imagen",
+    summary="Ver imagen del paciente (proxy)",
+    description=(
+        "Sirve la imagen del paciente directamente desde el backend. "
+        "Solo funciona si previamente se solicitó una URL firmada vigente. "
+        "Retorna 403 si el acceso expiró."
+    ),
+)
+async def ver_imagen(paciente_id: int, db: Session = Depends(get_db)):
+    contenido, content_type = await PacienteService.servir_imagen(
+        paciente_id=paciente_id,
+        db=db,
+    )
+    return Response(content=contenido, media_type=content_type)
+
+
 @router.put(
     "/{paciente_id}",
     response_model=PacienteResponse,
     summary="Actualizar un paciente",
     description=(
         "Actualiza los datos de un paciente existente. "
-        "Si se envía una nueva imagen, la anterior en Cloudinary se reemplaza."
+        "Si se envía una nueva imagen, reemplaza la anterior en Cloudinary."
     ),
 )
 def actualizar_paciente(
