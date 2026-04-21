@@ -1,42 +1,31 @@
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer
-from fastapi.responses import RedirectResponse
-from app.database import engine, Base
-from app.routers import pacientes, auth
-from app.scheduler import iniciar_scheduler
-import subprocess
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from app.database import SessionLocal
+from app.services.paciente_service import hacer_imagenes_privadas
 
-Base.metadata.create_all(bind=engine)
 
-security = HTTPBearer()
+def ejecutar_tarea_privacidad():
+    db = SessionLocal()
+    try:
+        print("Ejecutando tarea: limpiando accesos vencidos...")
+        hacer_imagenes_privadas(db)
+        print("Tarea completada ✅")
+    except Exception as e:
+        print(f"Error en tarea programada: {e}")
+    finally:
+        db.close()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    subprocess.run(["alembic", "upgrade", "head"])
-    scheduler = iniciar_scheduler()
-    yield
-    scheduler.shutdown()
 
-app = FastAPI(
-    title="API Radiografías",
-    description="API para gestión de placas radiográficas de pacientes.",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(auth.router, tags=["Autenticación"])
-app.include_router(pacientes.router, tags=["Pacientes"])
-
-@app.get("/")
-def root():
-    return RedirectResponse(url="/docs")
+def iniciar_scheduler():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        ejecutar_tarea_privacidad,
+        CronTrigger(minute="*/1"),
+        id="ocultar_imagenes",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=30,
+    )
+    scheduler.start()
+    print("Scheduler iniciado ✅ - Revisando accesos vencidos cada minuto")
+    return scheduler
