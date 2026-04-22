@@ -22,6 +22,7 @@ GOOGLE_REDIRECT_URI=
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
+BASE_URL=
 
 ## URL de producción
 https://examen1-progra4-production.up.railway.app/
